@@ -100,16 +100,39 @@ async function startSession(nodeId, proxy) {
 
     const startSessionUrl = `${apiBaseUrl}/nodes/${nodeId}/start-session`;
     console.log(`[${new Date().toISOString()}] Starting session for node ${nodeId}, it might take a while...`);
-    const response = await fetch(startSessionUrl, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${authToken}`
-        },
-        agent
-    });
-    const data = await response.json();
-    console.log(`[${new Date().toISOString()}] Start session response:`, data);
-    return data;
+
+    const startSessions = async () => {
+        const response = await fetch(startSessionUrl, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+            },
+            agent,
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`[${new Date().toISOString()}] Start session response:`, data);
+        return data;
+    };
+
+    const retryWithCatch = async (fn, maxRetries = 3) => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await fn();
+            } catch (error) {
+                console.error(`[Attempt ${attempt}] Failed to start session:`, error.message || error);
+                if (attempt === maxRetries) {
+                    throw new Error("Exceeded maximum retry attempts.");
+                }
+            }
+        }
+    };
+
+    return retryWithCatch(startSessions, 3);
 }
 
 async function pingNode(nodeId, proxy, ipAddress) {
